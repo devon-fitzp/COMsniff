@@ -27,6 +27,8 @@ pub fn render(app: &App, frame: &mut Frame) {
     match app.overlay {
         Overlay::PortDropdown { side, highlighted } => render_dropdown(app, frame, com_row, side, highlighted),
         Overlay::Config { field } => render_config_modal(app, frame, field),
+        Overlay::QuitConfirm { yes_selected } => render_quit_confirm(frame, yes_selected),
+        Overlay::Onboarding => render_onboarding(frame),
         Overlay::None => {}
     }
 }
@@ -86,6 +88,9 @@ fn port_label(app: &App, selected: Option<usize>, placeholder: &str) -> String {
 
 fn split_com_row(area: Rect) -> [Rect; 3] {
     Layout::horizontal([Constraint::Ratio(1, 3), Constraint::Ratio(1, 3), Constraint::Ratio(1, 3)]).areas(area)
+}
+fn split_yesno_row(area: Rect) -> [Rect; 2] {
+    Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]).areas(area)
 }
 
 fn render_log_view(app: &App, frame: &mut Frame, area: Rect) {
@@ -204,6 +209,64 @@ fn render_config_modal(app: &App, frame: &mut Frame, field: ConfigField) {
     let controls = Paragraph::new("\u{2191}/\u{2193} or Tab: field   \u{2190}/\u{2192}: change value   Enter/Esc: close")
         .style(Style::new().add_modifier(Modifier::DIM));
     frame.render_widget(controls, controls_area);
+}
+
+fn render_quit_confirm(frame: &mut Frame, yes_selected: bool) {
+    let area = popup_area(frame.area(), 24, 6);
+    frame.render_widget(Clear, area);
+
+    let block = Block::bordered().title("Quit");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let [message_area, buttons_area] =
+        Layout::vertical([Constraint::Length(1), Constraint::Length(3)]).areas(inner);
+
+    let message = Paragraph::new("Really quit?").style(Style::new());
+    frame.render_widget(message, message_area);
+
+    let [yes, no] = split_yesno_row(buttons_area);
+
+    let yes_block_label =  "Yes";
+    let yes_block =
+        Block::bordered().border_style(focus_style(yes_selected, true));
+    frame.render_widget(Paragraph::new(yes_block_label).block(yes_block), yes);
+    
+    let no_block_label =  "No";
+    let no_block =
+        Block::bordered().border_style(focus_style(!yes_selected, true));
+    frame.render_widget(Paragraph::new(no_block_label).block(no_block), no);
+    
+}
+
+fn render_onboarding(frame: &mut Frame) {
+    let lines = [
+        "Tab / Shift+Tab   move between controls",
+        "Arrow keys        move between controls",
+        "Enter / Space     activate the focused control",
+        "PageUp / PageDown scroll the log view",
+        "Q                 quit (with confirmation)",
+        "Ctrl+C            quit immediately",
+        "",
+        "Press any key to continue",
+    ];
+    let height = lines.len() as u16 + 2;
+    let area = popup_area(frame.area(), 46, height);
+    frame.render_widget(Clear, area);
+
+    let block = Block::bordered().title("Welcome to COMsniff");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let rows = Layout::vertical(vec![Constraint::Length(1); lines.len()]).split(inner);
+    for (row_area, line) in rows.iter().zip(lines) {
+        let style = if line.is_empty() || line == "Press any key to continue" {
+            Style::new().add_modifier(Modifier::DIM)
+        } else {
+            Style::new()
+        };
+        frame.render_widget(Paragraph::new(line).style(style), *row_area);
+    }
 }
 
 fn popup_area(area: Rect, width: u16, height: u16) -> Rect {

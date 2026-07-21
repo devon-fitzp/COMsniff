@@ -1,4 +1,5 @@
 use std::io::Write as _;
+use std::path::Path;
 use std::time::Duration;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -37,6 +38,8 @@ pub enum Overlay {
     None,
     PortDropdown { side: PortSide, highlighted: usize },
     Config { field: ConfigField },
+    QuitConfirm { yes_selected: bool },
+    Onboarding,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,9 +98,10 @@ impl App {
     pub fn new(available_ports: Vec<String>, port_enum_error: Option<String>) -> Self {
         let log_path = String::from("C:/logs/comsniff.txt");
         let log_path_cursor = log_path.chars().count();
+        let overlay = if onboarding_seen() { Overlay::None } else { Overlay::Onboarding };
         Self {
             focus: Focus::Config,
-            overlay: Overlay::None,
+            overlay,
             run_state: RunState::Stopped,
             available_ports,
             port_enum_error,
@@ -380,6 +384,33 @@ impl App {
         }
     }
 
+    fn handle_onboarding_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ') => {
+                self.overlay = Overlay::None;
+                mark_onboarding_seen();
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_quit_confirm_key(&mut self, key: KeyEvent) {
+        let Overlay::QuitConfirm { yes_selected } = self.overlay else { return };
+        match key.code {
+            KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
+                self.overlay = Overlay::QuitConfirm { yes_selected: !yes_selected };
+            }
+            KeyCode::Enter => {
+                if yes_selected {
+                    self.should_quit = true;
+                }
+                self.overlay = Overlay::None;
+            }
+            KeyCode::Esc => self.overlay = Overlay::None,
+            _ => {}
+        }
+    }
+
     fn handle_log_path_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Left => self.log_path_cursor = self.log_path_cursor.saturating_sub(1),
@@ -400,10 +431,20 @@ impl App {
     }
 
     fn handle_key(&mut self, key: KeyEvent) {
-        // Global quit -- deliberately Ctrl+C rather than 'q' or Esc, since
-        // both of those are needed for text entry / closing overlays.
+        // Ctrl+C always quits immediately, bypassing the confirm dialog --
+        // including from inside the dialog itself.
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.should_quit = true;
+            return;
+        }
+
+        // 'q' opens the confirm dialog, but only outside text entry -- LogPath
+        // needs to be able to type the letter q.
+        if key.code == KeyCode::Char('q')
+            && self.focus != Focus::LogPath
+            && matches!(self.overlay, Overlay::None)
+        {
+            self.overlay = Overlay::QuitConfirm { yes_selected: false };
             return;
         }
 
@@ -423,6 +464,14 @@ impl App {
             }
             Overlay::Config { .. } => {
                 self.handle_config_key(key);
+                return;
+            }
+            Overlay::QuitConfirm { .. } => {
+                self.handle_quit_confirm_key(key);
+                return;
+            }
+            Overlay::Onboarding => {
+                self.handle_onboarding_key(key);
                 return;
             }
         }
@@ -494,6 +543,19 @@ fn arrow_target(focus: Focus, key: KeyCode) -> Option<Focus> {
 
         _ => None,
     }
+}
+
+
+fn onboarding_seen() -> bool {
+    let Ok(profile) = std::env::var("USERPROFILE") else {
+        return false;
+    };
+    Path::new(&profile).join(".comsniff").exists()
+}
+
+fn mark_onboarding_seen() {
+    let Ok(profile) = std::env::var("USERPROFILE") else { return };
+    let _ = std::fs::write(Path::new(&profile).join(".comsniff"),b"");
 }
 
 /// Moves `from` one step (forward if `forward`, else backward) around a ring
