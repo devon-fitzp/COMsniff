@@ -104,7 +104,7 @@ impl App {
             port_left_selected: None,
             port_right_selected: None,
             config: ConfigSettings::default(),
-            log_lines: stub_log_lines(),
+            log_lines: Vec::new(),
             log_scroll: 0,
             log_enabled: false,
             log_path,
@@ -537,20 +537,4 @@ fn remove_char_at(s: &mut String, idx: usize) {
     if let Some((byte_idx, ch)) = s.char_indices().nth(idx) {
         s.replace_range(byte_idx..byte_idx + ch.len_utf8(), "");
     }
-}
-
-fn stub_log_lines() -> Vec<LogLine> {
-    let raw = [
-        (Direction::Outgoing, "DE IN 00"),
-        (Direction::Incoming, "ACK 00"),
-        (Direction::Outgoing, "DE CHG 500"),
-        (Direction::Incoming, "ACK"),
-        (Direction::Incoming, "TX APVD"),
-        (Direction::Incoming, "ECD 4234xxxxxx991234"),
-        (Direction::Incoming, "TXID 3f8da09d8cb0090"),
-        (Direction::Outgoing, "ACK"),
-    ];
-    raw.into_iter()
-        .map(|(direction, text)| LogLine { direction, text: text.to_string() })
-        .collect()
 }
