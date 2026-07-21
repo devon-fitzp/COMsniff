@@ -1,0 +1,11 @@
+[package]
+name = "COMsniff"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = "0.30.2"
+serialport = "4.9.0"
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+chrono = "0.4"
