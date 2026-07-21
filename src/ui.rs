@@ -27,6 +27,7 @@ pub fn render(app: &App, frame: &mut Frame) {
     match app.overlay {
         Overlay::PortDropdown { side, highlighted } => render_dropdown(app, frame, com_row, side, highlighted),
         Overlay::Config { field } => render_config_modal(app, frame, field),
+        Overlay::About => render_about(frame),
         Overlay::QuitConfirm { yes_selected } => render_quit_confirm(frame, yes_selected),
         Overlay::Onboarding => render_onboarding(frame),
         Overlay::None => {}
@@ -44,10 +45,12 @@ fn focus_style(is_focused: bool, enabled: bool) -> Style {
 }
 
 fn render_config_row(app: &App, frame: &mut Frame, area: Rect) {
-    let [button_area, status_area] = Layout::horizontal([Constraint::Length(12), Constraint::Min(0)]).areas(area);
+    let [config_button_area,about_button_area, status_area] = Layout::horizontal([Constraint::Length(12), Constraint::Length(12), Constraint::Min(0)]).areas(area);
 
-    let block = Block::bordered().border_style(focus_style(app.focus == Focus::Config, true));
-    frame.render_widget(Paragraph::new("Config").block(block), button_area);
+    let config_block = Block::bordered().border_style(focus_style(app.focus == Focus::Config, true));
+    let about_block = Block::bordered().border_style(focus_style(app.focus == Focus::About, true));
+    frame.render_widget(Paragraph::new("Config").block(config_block), config_button_area);
+    frame.render_widget(Paragraph::new("About").block(about_block), about_button_area);
 
     if let Some(msg) = &app.status_message {
         let line = Paragraph::new(msg.as_str()).style(Style::new().fg(Color::Yellow));
@@ -267,6 +270,37 @@ fn render_onboarding(frame: &mut Frame) {
         };
         frame.render_widget(Paragraph::new(line).style(style), *row_area);
     }
+}
+
+fn render_about(frame: &mut Frame) {
+    let lines = [
+        "COMsniff",
+        "",
+        "Copyright (c) 2026",
+        "Devon Fitzpatrick",
+        "",
+        "dmfitz.dev",
+        "",
+        "Press any key to return"
+    ];
+    let height = lines.len() as u16 + 2;
+
+    let area = popup_area(frame.area(), 46, height);
+    let block = Block::bordered().title("About COMsniff");
+    let inner = block.inner(area);
+    frame.render_widget(Clear, area);
+    frame.render_widget(block, area);
+
+    let rows = Layout::vertical(vec![Constraint::Length(1); lines.len()]).split(inner);
+    for (row_area, line) in rows.iter().zip(lines) {
+        let style = if line.is_empty() || line == "Press any key to return" {
+            Style::new().add_modifier(Modifier::DIM)
+        } else {
+            Style::new()
+        };
+        frame.render_widget(Paragraph::new(line).style(style), *row_area);
+    }
+    
 }
 
 fn popup_area(area: Rect, width: u16, height: u16) -> Rect {

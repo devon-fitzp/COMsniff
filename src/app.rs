@@ -11,8 +11,9 @@ use crate::ui;
 
 pub use crate::serial::PortSide;
 
-const FOCUS_ORDER: [Focus; 6] = [
+const FOCUS_ORDER: [Focus; 7] = [
     Focus::Config,
+    Focus::About,
     Focus::PortLeftSelector,
     Focus::StartStop,
     Focus::PortRightSelector,
@@ -23,6 +24,7 @@ const FOCUS_ORDER: [Focus; 6] = [
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
     Config,
+    About,
     PortLeftSelector,
     StartStop,
     PortRightSelector,
@@ -38,6 +40,7 @@ pub enum Overlay {
     None,
     PortDropdown { side: PortSide, highlighted: usize },
     Config { field: ConfigField },
+    About,
     QuitConfirm { yes_selected: bool },
     Onboarding,
 }
@@ -318,6 +321,10 @@ impl App {
     pub fn open_config(&mut self) {
         self.overlay = Overlay::Config { field: ConfigField::Encoding };
     }
+    
+    pub fn open_about(&mut self) {
+        self.overlay = Overlay::About;
+    }
 
     pub fn scroll_log_up(&mut self) {
         let max = self.log_lines.len().saturating_sub(1);
@@ -393,6 +400,13 @@ impl App {
             _ => {}
         }
     }
+    
+    fn handle_about_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ') => self.overlay = Overlay::None,
+            _ => {}
+        }
+    }
 
     fn handle_quit_confirm_key(&mut self, key: KeyEvent) {
         let Overlay::QuitConfirm { yes_selected } = self.overlay else { return };
@@ -462,6 +476,10 @@ impl App {
                 self.handle_dropdown_key(key);
                 return;
             }
+            Overlay::About => {
+                self.handle_about_key(key);
+                return;
+            }
             Overlay::Config { .. } => {
                 self.handle_config_key(key);
                 return;
@@ -502,6 +520,7 @@ impl App {
         if key.code == KeyCode::Enter || key.code == KeyCode::Char(' ') {
             match self.focus {
                 Focus::Config => self.open_config(),
+                Focus::About => self.open_about(),
                 Focus::PortLeftSelector => self.open_dropdown(PortSide::Left),
                 Focus::PortRightSelector => self.open_dropdown(PortSide::Right),
                 Focus::StartStop => self.toggle_run_state(),
@@ -532,6 +551,8 @@ fn arrow_target(focus: Focus, key: KeyCode) -> Option<Focus> {
         (LogCheckbox, KeyCode::Right) => Some(LogPath),
 
         (Config, KeyCode::Down) => Some(PortLeftSelector),
+        (Config, KeyCode::Right) => Some(About),
+        (About, KeyCode::Left) => Some(Config),
         (PortLeftSelector, KeyCode::Up) => Some(Config),
         (StartStop, KeyCode::Up) => Some(Config),
         (PortRightSelector, KeyCode::Up) => Some(Config),
